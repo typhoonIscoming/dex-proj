@@ -1,6 +1,8 @@
+
 # DEX 区块链事件扫描器实现详解
 
 ## 目录
+
 1. [整体架构](#整体架构)
 2. [合约事件分析](#合约事件分析)
 3. [Scanner 核心实现](#scanner-核心实现)
@@ -82,11 +84,13 @@ event PoolCreated(
 ```
 
 **事件特点**:
+
 - 所有参数都是 **非索引** (non-indexed)
 - 数据全部在 `data` 字段中
 - 用于创建新池子时触发
 
 **数据布局** (每个参数 32 字节):
+
 ```
 [0:32]    token0 (address)
 [32:64]   token1 (address)
@@ -112,11 +116,13 @@ event Mint(
 ```
 
 **事件特点**:
+
 - `owner` 是索引参数，在 `topics[1]` 中
 - 其他参数在 `data` 字段中
 - 表示添加流动性
 
 **数据布局**:
+
 ```
 Topics:
   [0] = 事件签名哈希
@@ -143,6 +149,7 @@ event Burn(
 ```
 
 **数据布局**:
+
 ```
 Topics:
   [0] = 事件签名哈希
@@ -171,6 +178,7 @@ event Swap(
 ```
 
 **数据布局**:
+
 ```
 Topics:
   [0] = 事件签名哈希
@@ -198,6 +206,7 @@ event Transfer(
 ```
 
 **数据布局**:
+
 ```
 Topics:
   [0] = 事件签名哈希
@@ -209,6 +218,7 @@ Data: 无 (所有参数都是索引的)
 ```
 
 **特殊值**:
+
 - `from = 0x0`: 表示 NFT mint (创建新 position)
 - `to = 0x0`: 表示 NFT burn (销毁 position)
 
@@ -232,6 +242,7 @@ SigMint = crypto.Keccak256Hash([]byte(
 ```
 
 **关键点**:
+
 - 事件签名格式必须与合约中定义的完全一致
 - 包括参数类型和顺序
 - 索引参数不影响签名计算
@@ -249,6 +260,7 @@ query := ethereum.FilterQuery{
 ```
 
 **优化说明**:
+
 - 使用 `Topics[0]` 过滤事件签名，比按地址过滤更高效
 - 一次查询获取所有相关事件，减少 RPC 调用
 - 在代码中进一步过滤地址和事件类型
@@ -315,6 +327,7 @@ func (s *Scanner) handlePoolCreated(vLog types.Log) {
 ```
 
 **处理步骤**:
+
 1. ✅ 解析 7 个参数（每个 32 字节）
 2. ✅ 确保代币记录存在（外键约束）
 3. ✅ 插入池子记录
@@ -352,6 +365,7 @@ func (s *Scanner) handleMint(vLog types.Log) {
 ```
 
 **关键逻辑**:
+
 - **双重路径**: 支持 NFT position 和普通 position
 - **流动性累加**: 使用 SQL 累加，避免查询合约状态
 - **Ticks 更新**: 同时更新 tick_lower 和 tick_upper
@@ -393,6 +407,7 @@ func (s *Scanner) handleSwap(vLog types.Log) {
 ```
 
 **关键点**:
+
 - **有符号数处理**: `amount0` 和 `amount1` 是 `int256`，需要处理补码
 - **状态同步**: 每次 Swap 都更新池子的价格和流动性
 
@@ -431,10 +446,12 @@ func (s *Scanner) handlePositionTransfer(vLog types.Log) {
 ### 1. Tokens 表
 
 **同步时机**:
+
 - PoolCreated 事件时自动创建
 - 使用 `ON CONFLICT DO NOTHING` 避免重复
 
 **字段填充**:
+
 ```go
 s.ensureToken(addr) // 插入默认值，后续可通过 RPC 查询完善
 ```
@@ -442,11 +459,13 @@ s.ensureToken(addr) // 插入默认值，后续可通过 RPC 查询完善
 ### 2. Pools 表
 
 **同步时机**:
+
 - PoolCreated 事件 → 创建记录
 - Swap 事件 → 更新价格和流动性
 - Mint/Burn 事件 → 更新流动性
 
 **关键字段**:
+
 - `liquidity`: 从 Swap 事件获取（最准确），或从 Mint/Burn 累加
 - `sqrt_price_x96`: 从 Swap 事件获取
 - `tick`: 从 Swap 事件获取
@@ -456,6 +475,7 @@ s.ensureToken(addr) // 插入默认值，后续可通过 RPC 查询完善
 **两种创建方式**:
 
 **方式1: 有 NFT Position ID**
+
 ```go
 // 从 Transfer 事件获取 tokenId
 positionID := findPositionIDFromTransaction(...)
@@ -463,6 +483,7 @@ updatePositionFromMint(positionID, ...)
 ```
 
 **方式2: 无 NFT (TestLP 直接添加)**
+
 ```go
 // 使用 owner + pool + tick 的哈希作为 ID
 hashInput := fmt.Sprintf("%s:%s:%d:%d", owner, pool, tickLower, tickUpper)
@@ -471,6 +492,7 @@ createPositionFromPoolMint(...)
 ```
 
 **流动性更新**:
+
 - Mint: `liquidity = liquidity + amount`
 - Burn: `liquidity = liquidity - amount`
 - 使用 `ON CONFLICT DO UPDATE` 实现 upsert
@@ -478,6 +500,7 @@ createPositionFromPoolMint(...)
 ### 4. Ticks 表
 
 **更新逻辑**:
+
 ```go
 // Mint 时
 tick_lower: liquidity_gross += amount, liquidity_net += amount
@@ -489,6 +512,7 @@ tick_upper: liquidity_gross -= amount, liquidity_net += amount
 ```
 
 **说明**:
+
 - `liquidity_gross`: 该 tick 点的总流动性（所有经过的持仓）
 - `liquidity_net`: 价格向上移动时的净流动性变化
   - tick_lower: 价格向上时流动性增加 → 正数
@@ -497,12 +521,14 @@ tick_upper: liquidity_gross -= amount, liquidity_net += amount
 ### 5. Swaps 表
 
 **记录内容**:
+
 - 交易双方地址
 - 交换数量（有符号）
 - 交易后的价格和流动性
 - 区块信息
 
 **用途**:
+
 - 交易历史查询
 - 价格走势分析
 - 流动性变化追踪
@@ -530,6 +556,7 @@ case SigMint:
 ```
 
 **为什么使用 Topics[0]**:
+
 - `Topics[0]` 总是事件签名的哈希值
 - 这是最高效的过滤方式
 - 比按地址过滤更快（Bloom Filter 优化）
@@ -549,6 +576,7 @@ parseSigned := func(b []byte) *big.Int {
 ```
 
 **原理**:
+
 - Solidity 的 `int256` 使用补码表示
 - `SetBytes` 将字节解释为无符号数
 - 如果值 >= 2^255，说明是负数，需要减去 2^256
@@ -568,6 +596,7 @@ positionID := hash.Bytes() // 转换为数字
 ```
 
 **设计考虑**:
+
 - NFT position: 使用合约分配的 tokenId
 - 普通 position: 使用确定性哈希，确保同一 owner+pool+tick 范围生成相同 ID
 
@@ -585,6 +614,7 @@ if err == nil && maxBlock.Valid {
 ```
 
 **优势**:
+
 - 服务重启后自动从上次位置继续
 - 避免重复处理已扫描的区块
 - 支持多表查询取最大值
@@ -608,6 +638,7 @@ if s.Pools[vLog.Address] {
 ```
 
 **作用**:
+
 - 减少数据库查询
 - 快速判断是否处理事件
 - 支持动态添加新池子
@@ -718,7 +749,8 @@ tx.Commit()
 
 ### Q2: 如何处理遗漏的事件？
 
-**A**: 
+**A**:
+
 - 定期全量扫描（从创世区块）
 - 使用 `MAX(block_number)` 恢复位置
 - 支持手动指定起始区块
@@ -726,6 +758,7 @@ tx.Commit()
 ### Q3: 如何验证数据准确性？
 
 **A**:
+
 - 对比链上状态（通过 RPC 查询）
 - 检查流动性总和是否一致
 - 验证价格变化是否符合 Swap 事件
@@ -962,6 +995,7 @@ func (s *Scanner) scanRange(start, end uint64) error {
 ```
 
 **流动性变化示意图**:
+
 ```
 价格移动方向: ←─────────────→
               ↓               ↓
@@ -1036,12 +1070,14 @@ func (s *Scanner) scanRange(start, end uint64) error {
 ### 1. 为什么使用事件而非状态查询？
 
 **事件驱动优势**:
+
 - ✅ 实时性: 事件立即触发，无需轮询
 - ✅ 效率: 只处理变化，不查询所有状态
 - ✅ 历史: 保留完整的历史记录
 - ✅ 可靠性: 事件不可篡改，数据可追溯
 
 **状态查询劣势**:
+
 - ❌ 需要知道所有池子地址
 - ❌ 无法获取历史变化
 - ❌ 需要频繁轮询，效率低
@@ -1049,11 +1085,13 @@ func (s *Scanner) scanRange(start, end uint64) error {
 ### 2. 为什么支持两种 Position 创建方式？
 
 **NFT Position (PositionManager)**:
+
 - 标准方式，有唯一 tokenId
 - 支持转移和交易
 - 更符合 DeFi 标准
 
 **虚拟 Position (TestLP/直接调用)**:
+
 - 兼容测试和简化场景
 - 使用哈希 ID 确保唯一性
 - 前端可以统一查询接口
@@ -1061,16 +1099,19 @@ func (s *Scanner) scanRange(start, end uint64) error {
 ### 3. 为什么使用累加而非查询合约？
 
 **累加方式**:
+
 ```go
 UPDATE pools SET liquidity = liquidity + $1
 ```
 
 **优势**:
+
 - 减少 RPC 调用（节省成本和时间）
 - 数据库操作更快
 - 支持离线处理
 
 **注意事项**:
+
 - 需要确保事件不遗漏
 - 定期验证数据准确性
 
@@ -1173,6 +1214,7 @@ Scanner 实现的核心要点：
 5. **性能优化**: 批量查询、缓存机制、高效过滤
 
 通过这个实现，我们可以：
+
 - ✅ 实时同步链上状态到数据库
 - ✅ 支持前端查询和历史分析
 - ✅ 提供流动性深度和价格数据
@@ -1200,6 +1242,7 @@ tokens (代币表)
 ### 核心表说明
 
 #### 1. tokens 表
+
 ```sql
 CREATE TABLE tokens (
     address TEXT PRIMARY KEY,  -- 代币合约地址
@@ -1212,6 +1255,7 @@ CREATE TABLE tokens (
 **用途**: 存储所有 ERC20 代币信息
 
 #### 2. pools 表
+
 ```sql
 CREATE TABLE pools (
     address TEXT PRIMARY KEY,
@@ -1227,11 +1271,13 @@ CREATE TABLE pools (
 ```
 
 **关键字段**:
+
 - `liquidity`: 从 Mint/Burn 事件累加，或从 Swap 事件获取最新值
 - `sqrt_price_x96`: 从 Swap 事件更新（最准确）
 - `tick`: 从 Swap 事件更新
 
 #### 3. positions 表
+
 ```sql
 CREATE TABLE positions (
     id NUMERIC PRIMARY KEY,        -- NFT token ID 或哈希ID
@@ -1250,10 +1296,12 @@ CREATE TABLE positions (
 ```
 
 **ID 生成策略**:
+
 - **有 NFT**: 使用 `PositionManager` 分配的 `tokenId`
 - **无 NFT**: 使用 `Keccak256(owner:pool:tickLower:tickUpper)` 的哈希值
 
 #### 4. ticks 表
+
 ```sql
 CREATE TABLE ticks (
     pool_address TEXT REFERENCES pools(address),
@@ -1267,12 +1315,14 @@ CREATE TABLE ticks (
 ```
 
 **流动性计算**:
+
 - `liquidity_gross`: 所有经过该 tick 的流动性总和
 - `liquidity_net`: 价格向上移动时的净变化
   - `tick_lower`: 正值（进入区间）
   - `tick_upper`: 负值（离开区间）
 
 #### 5. swaps 表
+
 ```sql
 CREATE TABLE swaps (
     transaction_hash TEXT NOT NULL,
@@ -1292,6 +1342,7 @@ CREATE TABLE swaps (
 ```
 
 **索引优化**:
+
 ```sql
 CREATE INDEX idx_swaps_pool_timestamp 
     ON swaps(pool_address, block_timestamp DESC);
@@ -1325,6 +1376,7 @@ Starting blockchain scanner...
 ```
 
 **处理步骤**:
+
 1. 解析事件数据获取 token0、token1、fee、tick 范围
 2. 确保 tokens 表中有这两个代币记录
 3. 插入 pools 表
@@ -1343,6 +1395,7 @@ Starting blockchain scanner...
 ```
 
 **处理流程**:
+
 1. 解析 Mint 事件获取 owner、amount
 2. 更新 `liquidity_events` 表
 3. 更新 `pools.liquidity`（累加）
@@ -1364,6 +1417,7 @@ Starting blockchain scanner...
 ```
 
 **处理步骤**:
+
 1. 解析有符号数 amount0、amount1
 2. 更新 `pools` 表的价格和流动性
 3. 插入 `swaps` 表记录
@@ -1457,17 +1511,20 @@ LIMIT 20;
 ## 扩展阅读
 
 ### 相关文件
+
 - `scanner.go`: Scanner 核心实现
 - `main.go`: 服务入口和配置
 - `schema.sql`: 数据库表结构定义
 - `config.yaml`: 配置文件
 
 ### 合约文件
+
 - `Pool.sol`: 流动性池合约
 - `PositionManager.sol`: NFT 头寸管理合约
 - `PoolManager.sol`: 池子工厂合约
 
 ### 进一步优化方向
+
 1. 实现 ticks 的完整管理（支持多个 tick 范围）
 2. 添加数据验证和修复机制
 3. 实现分布式扫描（多实例）
@@ -1475,4 +1532,3 @@ LIMIT 20;
 5. 优化数据库查询性能
 6. 实现事件重放机制（修复遗漏数据）
 7. 添加数据导出功能（CSV/JSON）
-

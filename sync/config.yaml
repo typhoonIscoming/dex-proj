@@ -7,10 +7,13 @@
 #   Name: postgres
 
 Database:
-  Host: db.tqpvxiwqnlzfqefwjgox.supabase.co
+  # Host: db.tqpvxiwqnlzfqefwjgox.supabase.co
+  Host: db.tsvxrsplzkxtqheaoehp.supabase.co
   Port: 5432
   User: postgres
-  Password: 233333@Zj
+  # Password: 233333@Zj  3OkYoTTfVVJqOUuQ
+  Password: xbl9AQMkPMllcehc
+  # Name: postgres typhoonIscoming
   Name: postgres
 
 # Infura:
@@ -19,7 +22,7 @@ Database:
 
 
 RPC:
-  Url: https://sepolia.infura.io/v3/3fb192ba9f724e6497fff0a0abd04f98
+  Url: https://sepolia.infura.io/v3/d8ed0bd1de8242d998a1405b6932ab33
   StartBlock: 	10534000
 
  
@@ -31,9 +34,12 @@ RPC:
 
 
 Contracts:
-  PoolManager: 0x1a1a6d0ef39908aa8b8dd0b7052dc05b07b64735
-  PositionManager: 0xa7e9e22cc2cfe5831e683b531ab636dca545acf5
-  SwapRouter: 0xbdc9b8f2ab20989198ab8f47fdbb2992f219726d
+  # PoolManager: 0x1a1a6d0ef39908aa8b8dd0b7052dc05b07b64735
+  PoolManager: 0xddC12b3F9F7C91C79DA7433D8d212FB78d609f7B
+  # PositionManager: 0xa7e9e22cc2cfe5831e683b531ab636dca545acf5
+  PositionManager: 0xbe766Bf20eFfe431829C5d5a2744865974A0B610
+  # SwapRouter: 0xbdc9b8f2ab20989198ab8f47fdbb2992f219726d
+  SwapRouter: 0xD2c220143F5784b3bD84ae12747d97C8A36CeCB2
 
 
 # Tokens:
