@@ -82,7 +82,7 @@ export default function PoolsPage() {
 		}
 		return `$${value.toFixed(2)}`;
 	};
-
+	console.log('pool', pools);
 	return (
 		<div className="max-w-6xl mx-auto px-4 py-8">
 			<NetworkChecker>
