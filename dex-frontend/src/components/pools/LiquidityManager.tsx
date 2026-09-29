@@ -727,7 +727,15 @@ export default function LiquidityManager() {
 				const amountWei1 = parseUnits(amount1, token1.decimals);
 				const canSkipApprove0 = ENABLE_PERMIT_LIQUIDITY && token0SupportsPermit;
 				const canSkipApprove1 = ENABLE_PERMIT_LIQUIDITY && token1SupportsPermit;
-
+				console.log('Checking allowances:', {
+					ENABLE_PERMIT_LIQUIDITY,
+					allowance0: allowance0Response.allowance,
+					allowance1: allowance1Response.allowance,
+					amount0,
+					amount1,
+					canSkipApprove0,
+					canSkipApprove1,
+				});
 				setNeedsApproval0(
 					!canSkipApprove0 && BigInt(allowance0Response.allowance) < amountWei0
 				);
